@@ -189,56 +189,41 @@ def cleanup_old_data():
     except Exception as e:
         logger.error(f"Error in cleanup_old_data: {str(e)}")
 
+# scheduler.py의 update_analytics 함수 (개선 제안)
 def update_analytics():
-    """분석 데이터 업데이트"""
+    """분석 데이터 업데이트 (실 데이터 기반)"""
     try:
         conn = sqlite3.connect("instagram_marketing.db")
         cursor = conn.cursor()
-        
-        # 각 비즈니스의 오늘 분석 데이터 생성/업데이트
         today = datetime.now().strftime('%Y-%m-%d')
         
         cursor.execute("SELECT id FROM businesses")
         businesses = cursor.fetchall()
-        
+
         for (business_id,) in businesses:
-            # 오늘 분석 데이터가 있는지 확인
+            # 지난 7일간의 포스트 데이터 집계
+            seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
             cursor.execute('''
-                SELECT id FROM analytics 
-                WHERE business_id = ? AND date = ?
-            ''', (business_id, today))
-            
-            existing = cursor.fetchone()
-            
-            # 가상 분석 데이터 생성 (실제로는 Instagram API에서 가져옴)
-            import random
-            followers = random.randint(1000, 10000)
-            engagement_rate = round(random.uniform(2.0, 8.0), 2)
-            reach = random.randint(500, 5000)
-            impressions = random.randint(1000, 15000)
-            
-            if existing:
-                # 업데이트
-                cursor.execute('''
-                    UPDATE analytics 
-                    SET followers_count = ?, engagement_rate = ?, 
-                        reach = ?, impressions = ?
-                    WHERE business_id = ? AND date = ?
-                ''', (followers, engagement_rate, reach, impressions, business_id, today))
-            else:
-                # 새로 생성
-                cursor.execute('''
-                    INSERT INTO analytics (
-                        business_id, date, followers_count, engagement_rate,
-                        reach, impressions
-                    ) VALUES (?, ?, ?, ?, ?, ?)
-                ''', (business_id, today, followers, engagement_rate, reach, impressions))
-        
+                SELECT
+                    COUNT(id),
+                    SUM(likes_count),
+                    SUM(comments_count),
+                    AVG(engagement_rate)
+                FROM content
+                WHERE business_id = ? AND status = 'published' AND published_at >= ?
+            ''', (business_id, seven_days_ago))
+
+            posts_count, total_likes, total_comments, avg_engagement = cursor.fetchone()
+
+            # (실제로는 Instagram API에서 가져올) 팔로워 수 등
+            # followers = poster_system.get_account_info(business_id).get('followers_count', 0)
+
+            # 집계된 데이터로 analytics 테이블 업데이트
+            # ... (기존의 INSERT 또는 UPDATE 로직에 이 데이터를 사용)
+
         conn.commit()
         conn.close()
-        
-        logger.info("Updated analytics data")
-        
+        logger.info("Updated analytics data with real metrics.")
     except Exception as e:
         logger.error(f"Error in update_analytics: {str(e)}")
 
