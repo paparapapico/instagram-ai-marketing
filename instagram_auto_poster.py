@@ -1,46 +1,37 @@
-# instagram_auto_poster.py
+# instagram_auto_poster.py 상단 수정
 import requests
 import json
 import time
 from datetime import datetime
-from openai import OpenAI
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
 load_dotenv()
 
 class InstagramAutoPoster:
     def __init__(self):
-        # Instagram API 정보 (실제 값으로 교체 필요)
-        self.instagram_account_id = "17841475725247504"  # 실제 Instagram 계정 ID
-        self.access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')  # Graph API Explorer에서 생성한 토큰
+        self.instagram_account_id = "17841475725247504"
+        self.access_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
-        
-        if self.openai_api_key:
-            self.openai_client = OpenAI(api_key=self.openai_api_key)
-        else:
-            self.openai_client = None
-        
         self.base_url = "https://graph.facebook.com/v18.0"
     
     def generate_content_with_ai(self, business_info):
-        """AI로 Instagram 콘텐츠 생성"""
-        if not self.openai_client:
-            print("OpenAI API 키가 설정되지 않았습니다.")
+        """AI로 Instagram 콘텐츠 생성 (v1.x 호환)"""
+        if not self.openai_api_key:
             return self._get_fallback_content()
             
         try:
+            import openai
+            
+            # 새로운 방식으로 클라이언트 생성
+            client = openai.OpenAI(api_key=self.openai_api_key)
+            
             prompt = f"""
             다음 비즈니스를 위한 Instagram 포스트를 작성해주세요:
             
             비즈니스: {business_info.get('name', '마케팅 자동화')}
             업종: {business_info.get('industry', '소프트웨어')}
             타겟: {business_info.get('target', '소상공인')}
-            
-            요구사항:
-            1. 매력적인 캡션 (100자 내외)
-            2. 관련 해시태그 5개
-            3. 감정을 자극하는 내용
             
             JSON 형식으로 응답:
             {{
@@ -49,27 +40,60 @@ class InstagramAutoPoster:
             }}
             """
             
-            response = self.openai_client.chat.completions.create(
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=300,
                 temperature=0.7
             )
             
-            content = json.loads(response.choices[0].message.content)
+            content_text = response.choices[0].message.content
             
-            # 캡션과 해시태그 합치기
-            full_caption = f"{content['caption']}\n\n{' '.join(content['hashtags'])}"
-            
-            return {
-                'caption': full_caption,
-                'hashtags': content['hashtags'],
-                'raw_caption': content['caption']
-            }
+            # JSON 파싱 시도
+            try:
+                content = json.loads(content_text)
+                full_caption = f"{content['caption']}\n\n{' '.join(content['hashtags'])}"
+                
+                return {
+                    'caption': full_caption,
+                    'hashtags': content['hashtags'],
+                    'raw_caption': content['caption']
+                }
+            except:
+                # JSON 파싱 실패 시 텍스트 그대로 사용
+                return {
+                    'caption': content_text + "\n\n#마케팅자동화 #인스타그램 #비즈니스",
+                    'hashtags': ['#마케팅자동화', '#인스타그램', '#비즈니스'],
+                    'raw_caption': content_text
+                }
             
         except Exception as e:
             print(f"AI 콘텐츠 생성 오류: {e}")
             return self._get_fallback_content()
+    
+    def generate_image_with_dalle(self, description):
+        """DALL-E로 이미지 생성 (v1.x 호환)"""
+        if not self.openai_api_key:
+            return "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
+            
+        try:
+            import openai
+            
+            client = openai.OpenAI(api_key=self.openai_api_key)
+            
+            response = client.images.generate(
+                model="dall-e-2",  # dall-e-3 대신 dall-e-2 사용 (더 안정적)
+                prompt=f"{description}, professional, high quality, social media style",
+                n=1,
+                size="1024x1024"
+            )
+            
+            return response.data[0].url
+            
+        except Exception as e:
+            print(f"이미지 생성 오류: {e}")
+            return "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
+    
     
     def _get_fallback_content(self):
         """AI 실패 시 대체 콘텐츠"""
