@@ -1,4 +1,4 @@
-# instagram_auto_poster.py 상단 수정
+# instagram_auto_poster.py (수정된 버전)
 import requests
 import json
 import time
@@ -16,15 +16,22 @@ class InstagramAutoPoster:
         self.base_url = "https://graph.facebook.com/v18.0"
     
     def generate_content_with_ai(self, business_info):
-        """AI로 Instagram 콘텐츠 생성 (v1.x 호환)"""
+        """AI로 Instagram 콘텐츠 생성"""
         if not self.openai_api_key:
+            print("OpenAI API 키가 없습니다. 기본 콘텐츠를 사용합니다.")
             return self._get_fallback_content()
             
         try:
-            import openai
-            
-            # 새로운 방식으로 클라이언트 생성
-            client = openai.OpenAI(api_key=self.openai_api_key)
+            # OpenAI 라이브러리 동적 import
+            try:
+                import openai
+                client = openai.OpenAI(api_key=self.openai_api_key)
+            except ImportError:
+                print("OpenAI 라이브러리가 설치되지 않았습니다.")
+                return self._get_fallback_content()
+            except Exception as e:
+                print(f"OpenAI 클라이언트 생성 오류: {e}")
+                return self._get_fallback_content()
             
             prompt = f"""
             다음 비즈니스를 위한 Instagram 포스트를 작성해주세요:
@@ -59,7 +66,7 @@ class InstagramAutoPoster:
                     'hashtags': content['hashtags'],
                     'raw_caption': content['caption']
                 }
-            except:
+            except json.JSONDecodeError:
                 # JSON 파싱 실패 시 텍스트 그대로 사용
                 return {
                     'caption': content_text + "\n\n#마케팅자동화 #인스타그램 #비즈니스",
@@ -72,47 +79,26 @@ class InstagramAutoPoster:
             return self._get_fallback_content()
     
     def generate_image_with_dalle(self, description):
-        """DALL-E로 이미지 생성 (v1.x 호환)"""
+        """DALL-E로 이미지 생성"""
         if not self.openai_api_key:
+            print("OpenAI API 키가 없습니다. 기본 이미지를 사용합니다.")
             return "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
             
         try:
-            import openai
-            
-            client = openai.OpenAI(api_key=self.openai_api_key)
+            # OpenAI 라이브러리 동적 import
+            try:
+                import openai
+                client = openai.OpenAI(api_key=self.openai_api_key)
+            except ImportError:
+                print("OpenAI 라이브러리가 설치되지 않았습니다.")
+                return "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
+            except Exception as e:
+                print(f"OpenAI 클라이언트 생성 오류: {e}")
+                return "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
             
             response = client.images.generate(
                 model="dall-e-2",  # dall-e-3 대신 dall-e-2 사용 (더 안정적)
                 prompt=f"{description}, professional, high quality, social media style",
-                n=1,
-                size="1024x1024"
-            )
-            
-            return response.data[0].url
-            
-        except Exception as e:
-            print(f"이미지 생성 오류: {e}")
-            return "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
-    
-    
-    def _get_fallback_content(self):
-        """AI 실패 시 대체 콘텐츠"""
-        return {
-            'caption': "🚀 Instagram 마케팅 자동화로 비즈니스를 성장시키세요!\n\n#마케팅자동화 #인스타그램 #비즈니스 #성장 #자동화",
-            'hashtags': ['#마케팅자동화', '#인스타그램', '#비즈니스', '#성장', '#자동화'],
-            'raw_caption': "🚀 Instagram 마케팅 자동화로 비즈니스를 성장시키세요!"
-        }
-    
-    def generate_image_with_dalle(self, description):
-        """DALL-E로 이미지 생성"""
-        if not self.openai_client:
-            print("OpenAI API 키가 설정되지 않았습니다. 기본 이미지를 사용합니다.")
-            return "https://via.placeholder.com/1024x1024/4285f4/white?text=Instagram+Marketing+Bot"
-            
-        try:
-            response = self.openai_client.images.generate(
-                model="dall-e-3",
-                prompt=f"{description}, professional, high quality, social media style, bright colors",
                 n=1,
                 size="1024x1024"
             )
@@ -123,8 +109,15 @@ class InstagramAutoPoster:
             
         except Exception as e:
             print(f"이미지 생성 오류: {e}")
-            # 테스트용 기본 이미지 URL
-            return "https://via.placeholder.com/1024x1024/4285f4/white?text=Instagram+Marketing+Bot"
+            return "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
+    
+    def _get_fallback_content(self):
+        """AI 실패 시 대체 콘텐츠"""
+        return {
+            'caption': "🚀 Instagram 마케팅 자동화로 비즈니스를 성장시키세요!\n\n#마케팅자동화 #인스타그램 #비즈니스 #성장 #자동화",
+            'hashtags': ['#마케팅자동화', '#인스타그램', '#비즈니스', '#성장', '#자동화'],
+            'raw_caption': "🚀 Instagram 마케팅 자동화로 비즈니스를 성장시키세요!"
+        }
     
     def create_media_container(self, image_url, caption):
         """Instagram 미디어 컨테이너 생성"""
@@ -225,6 +218,10 @@ class InstagramAutoPoster:
     
     def get_account_info(self):
         """Instagram 계정 정보 확인"""
+        if not self.access_token:
+            print("Instagram Access Token이 설정되지 않았습니다.")
+            return None
+            
         url = f"https://graph.instagram.com/{self.instagram_account_id}"
         params = {
             'fields': 'name,username,profile_picture_url,media_count,followers_count',
@@ -252,6 +249,9 @@ class InstagramAutoPoster:
     
     def get_recent_posts(self, limit=5):
         """최근 게시물 목록 가져오기"""
+        if not self.access_token:
+            return []
+            
         url = f"https://graph.instagram.com/{self.instagram_account_id}/media"
         params = {
             'fields': 'id,caption,media_type,media_url,timestamp,like_count,comments_count',
@@ -276,50 +276,3 @@ class InstagramAutoPoster:
         except Exception as e:
             print(f"게시물 조회 오류: {e}")
             return []
-
-# 사용 예시 및 테스트
-def main():
-    """메인 실행 함수"""
-    
-    # Instagram 포스터 초기화
-    poster = InstagramAutoPoster()
-    
-    print("=== Instagram 자동 포스팅 시스템 테스트 ===\n")
-    
-    # 1. 계정 정보 확인
-    print("1️⃣ Instagram 계정 정보 확인:")
-    account_info = poster.get_account_info()
-    print()
-    
-    # 2. 최근 게시물 확인
-    print("2️⃣ 최근 게시물 확인:")
-    recent_posts = poster.get_recent_posts(3)
-    print()
-    
-    # 3. 자동 포스팅 테스트
-    print("3️⃣ 자동 포스팅 테스트:")
-    
-    # 테스트용 비즈니스 정보
-    test_business = {
-        'name': 'Automarketing Bot',
-        'industry': 'Instagram 마케팅 자동화',
-        'target': '소상공인, 개인사업자, 마케팅 담당자'
-    }
-    
-    # 실제 포스팅 (주의: 실제 Instagram에 업로드됩니다!)
-    user_input = input("실제 Instagram에 포스팅하시겠습니까? (y/n): ")
-    
-    if user_input.lower() == 'y':
-        post_id = poster.post_to_instagram(test_business)
-        if post_id:
-            print(f"\n🎉 성공! Instagram에서 포스트를 확인하세요.")
-            print(f"Post ID: {post_id}")
-        else:
-            print("\n❌ 포스팅에 실패했습니다.")
-    else:
-        print("테스트를 건너뛰었습니다.")
-    
-    print("\n=== 테스트 완료 ===")
-
-if __name__ == "__main__":
-    main()

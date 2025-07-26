@@ -1,8 +1,8 @@
-# main.py - FastAPI 메인 애플리케이션
-from fastapi import FastAPI, HTTPException, Depends, Request, Form, File, UploadFile
+# main.py - FastAPI 메인 애플리케이션 (수정된 버전)
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -10,25 +10,9 @@ from typing import List, Optional, Dict
 import sqlite3
 import json
 import jwt
-import hashlib
 from datetime import datetime, timedelta
 import os
-import asyncio
 from pathlib import Path
-
-# main.py 상단에 추가 (기존 import 아래)
-from instagram_auto_poster import InstagramAutoPoster
-import os
-from openai import OpenAI
-
-# 시스템 초기화 (app 생성 후에 추가)
-poster_system = InstagramAutoPoster()
-
-# OpenAI 클라이언트 직접 초기화
-openai_client = None
-if os.getenv("OPENAI_API_KEY"):
-    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 
 # 프로젝트 구조 생성
 def create_project_structure():
@@ -38,23 +22,18 @@ def create_project_structure():
         "static/css",
         "static/js", 
         "static/images",
-        "static/fonts",
-        "components",
-        "utils",
-        "database"
+        "static/fonts"
     ]
     
     for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
-    
-    print("✅ 프로젝트 구조 생성 완료")
 
 # FastAPI 앱 초기화
 app = FastAPI(
     title="Instagram AI Marketing Automation",
     description="Enterprise-grade Instagram marketing automation platform",
     version="2.0.0",
-    docs_url="/admin/docs",  # API 문서를 관리자 경로로 이동
+    docs_url="/admin/docs",
     redoc_url="/admin/redoc"
 )
 
@@ -69,8 +48,13 @@ app.add_middleware(
 
 # 정적 파일 및 템플릿 설정
 create_project_structure()
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    templates = Jinja2Templates(directory="templates")
+except Exception as e:
+    print(f"정적 파일 설정 오류: {e}")
+    templates = None
 
 # 보안 설정
 security = HTTPBearer()
@@ -92,161 +76,69 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class ContentRequest(BaseModel):
-    business_info: Dict
-    content_type: str = "post"
-    platform: str = "instagram"
-
-class ScheduleRequest(BaseModel):
-    client_id: int
-    posts_per_week: int = 3
-    start_date: Optional[str] = None
-
-class BusinessUpdate(BaseModel):
-    business_name: Optional[str] = None
-    industry: Optional[str] = None
-    target_audience: Optional[str] = None
-    brand_voice: Optional[str] = None
-    website: Optional[str] = None
-    phone: Optional[str] = None
-
-# 데이터베이스 관련 함수들 (database/db_manager.py로 분리 예정)
+# 데이터베이스 초기화
 def init_database():
     """데이터베이스 초기화"""
-    conn = sqlite3.connect("instagram_marketing.db")
-    cursor = conn.cursor()
-    
-    # 사용자 테이블 (확장됨)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            full_name TEXT,
-            phone TEXT,
-            is_active BOOLEAN DEFAULT TRUE,
-            is_premium BOOLEAN DEFAULT FALSE,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            last_login TEXT,
-            profile_image TEXT
-        )
-    ''')
-    
-    # 비즈니스 정보 테이블 (확장됨)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS businesses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            business_name TEXT NOT NULL,
-            industry TEXT,
-            target_audience TEXT,
-            brand_voice TEXT,
-            website TEXT,
-            phone TEXT,
-            logo_url TEXT,
-            subscription_plan TEXT DEFAULT 'basic',
-            monthly_fee INTEGER DEFAULT 150000,
-            instagram_username TEXT,
-            instagram_connected BOOLEAN DEFAULT FALSE,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    # 콘텐츠 테이블 (확장됨)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS content (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            business_id INTEGER,
-            title TEXT,
-            caption TEXT,
-            hashtags TEXT,
-            image_url TEXT,
-            content_type TEXT DEFAULT 'post',
-            platform TEXT DEFAULT 'instagram',
-            status TEXT DEFAULT 'draft',
-            engagement_rate REAL DEFAULT 0.0,
-            likes_count INTEGER DEFAULT 0,
-            comments_count INTEGER DEFAULT 0,
-            shares_count INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            published_at TEXT,
-            FOREIGN KEY (business_id) REFERENCES businesses (id)
-        )
-    ''')
-    
-    # 스케줄 테이블 (확장됨)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS content_schedule (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            business_id INTEGER,
-            content_id INTEGER,
-            scheduled_datetime TEXT,
-            status TEXT DEFAULT 'pending',
-            post_id TEXT,
-            error_message TEXT,
-            retry_count INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT,
-            FOREIGN KEY (business_id) REFERENCES businesses (id),
-            FOREIGN KEY (content_id) REFERENCES content (id)
-        )
-    ''')
-    
-    # 분석 데이터 테이블
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS analytics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            business_id INTEGER,
-            date TEXT,
-            platform TEXT DEFAULT 'instagram',
-            followers_count INTEGER DEFAULT 0,
-            posts_count INTEGER DEFAULT 0,
-            engagement_rate REAL DEFAULT 0.0,
-            reach INTEGER DEFAULT 0,
-            impressions INTEGER DEFAULT 0,
-            profile_visits INTEGER DEFAULT 0,
-            website_clicks INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (business_id) REFERENCES businesses (id)
-        )
-    ''')
-    
-    # 사용자 세션 테이블
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            business_id INTEGER,
-            token TEXT,
-            expires_at TEXT,
-            ip_address TEXT,
-            user_agent TEXT,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (business_id) REFERENCES businesses (id)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-    print("✅ 데이터베이스 초기화 완료")
+    try:
+        conn = sqlite3.connect("instagram_marketing.db")
+        cursor = conn.cursor()
+        
+        # 사용자 테이블
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                full_name TEXT,
+                phone TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                is_premium BOOLEAN DEFAULT FALSE,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_login TEXT,
+                profile_image TEXT
+            )
+        ''')
+        
+        # 비즈니스 정보 테이블
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS businesses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                business_name TEXT NOT NULL,
+                industry TEXT,
+                target_audience TEXT,
+                brand_voice TEXT,
+                website TEXT,
+                phone TEXT,
+                logo_url TEXT,
+                subscription_plan TEXT DEFAULT 'basic',
+                monthly_fee INTEGER DEFAULT 150000,
+                instagram_username TEXT,
+                instagram_connected BOOLEAN DEFAULT FALSE,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        print("✅ 데이터베이스 초기화 완료")
+    except Exception as e:
+        print(f"데이터베이스 초기화 오류: {e}")
 
-# 유틸리티 함수들 (utils/ 폴더로 분리 예정)
+# 유틸리티 함수들
 def hash_password(password: str) -> str:
-    """비밀번호 해싱 (보안 강화)"""
-    import bcrypt
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def verify_password(password: str, hashed: str) -> bool:
-    """비밀번호 검증 (보안 강화)"""
-    import bcrypt
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    """비밀번호 해싱"""
+    try:
+        import bcrypt
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    except ImportError:
+        import hashlib
+        return hashlib.sha256(password.encode()).hexdigest()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """JWT 토큰 생성 (보안 강화)"""
+    """JWT 토큰 생성"""
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(hours=24))
     to_encode.update({
@@ -256,78 +148,300 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     })
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """현재 사용자 정보 가져오기 (보안 강화)"""
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        business_id: int = payload.get("business_id")
-        
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-            
-        # 토큰 유효성 추가 검증
-        conn = sqlite3.connect("instagram_marketing.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT u.id, u.email, u.is_active, b.id as business_id
-            FROM users u
-            LEFT JOIN businesses b ON u.id = b.user_id
-            WHERE u.id = ? AND u.is_active = TRUE
-        """, (user_id,))
-        
-        user_data = cursor.fetchone()
-        conn.close()
-        
-        if not user_data:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
-            
-        return {
-            "user_id": user_data[0],
-            "email": user_data[1],
-            "business_id": user_data[3] or business_id
-        }
-        
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-
-# 메인 라우트들
+# 시작 이벤트
 @app.on_event("startup")
 async def startup_event():
     """앱 시작 시 초기화"""
     init_database()
     print("🚀 Instagram AI Marketing Platform 시작!")
 
+# 메인 라우트들
 @app.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request):
     """프리미엄 랜딩 페이지"""
-    return templates.TemplateResponse("landing.html", {
-        "request": request,
-        "year": datetime.now().year
-    })
+    if templates:
+        try:
+            return templates.TemplateResponse("landing.html", {
+                "request": request,
+                "year": datetime.now().year
+            })
+        except Exception as e:
+            print(f"템플릿 로드 오류: {e}")
+    
+    # 기본 HTML 응답
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Instagram AI Marketing Platform</title>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+            }
+            .container {
+                text-align: center;
+                max-width: 800px;
+                padding: 40px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 20px;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            }
+            h1 {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                font-weight: 800;
+            }
+            p {
+                font-size: 1.2rem;
+                margin-bottom: 2rem;
+                opacity: 0.9;
+            }
+            .btn {
+                background: white;
+                color: #667eea;
+                padding: 15px 30px;
+                border: none;
+                border-radius: 12px;
+                font-size: 1.1rem;
+                font-weight: 600;
+                cursor: pointer;
+                margin: 10px;
+                text-decoration: none;
+                display: inline-block;
+                transition: all 0.3s ease;
+            }
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            }
+            .features {
+                margin-top: 3rem;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 2rem;
+            }
+            .feature {
+                padding: 1.5rem;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+            }
+            .status {
+                margin: 2rem 0;
+                padding: 1rem;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 Instagram AI Marketing</h1>
+            <p>AI 기반 Instagram 마케팅 자동화 플랫폼</p>
+            
+            <div class="status">
+                <h3>✅ 플랫폼이 성공적으로 배포되었습니다!</h3>
+                <p>현재 시간: <span id="time"></span></p>
+            </div>
+            
+            <div>
+                <a href="/dashboard" class="btn">대시보드 이동</a>
+                <a href="/admin/docs" class="btn">API 문서</a>
+                <button class="btn" onclick="testAPI()">연결 테스트</button>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <h4>🤖 AI 콘텐츠 생성</h4>
+                    <p>GPT-4로 자동 콘텐츠 생성</p>
+                </div>
+                <div class="feature">
+                    <h4>⏰ 스마트 스케줄링</h4>
+                    <p>최적 시간 자동 포스팅</p>
+                </div>
+                <div class="feature">
+                    <h4>📊 실시간 분석</h4>
+                    <p>성과 분석 및 인사이트</p>
+                </div>
+            </div>
+            
+            <div id="result" style="margin-top: 2rem;"></div>
+        </div>
+        
+        <script>
+            // 현재 시간 표시
+            function updateTime() {
+                document.getElementById('time').textContent = new Date().toLocaleString('ko-KR');
+            }
+            updateTime();
+            setInterval(updateTime, 1000);
+            
+            // API 테스트
+            async function testAPI() {
+                const result = document.getElementById('result');
+                result.innerHTML = '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">테스트 중...</div>';
+                
+                try {
+                    const response = await fetch('/test');
+                    const data = await response.json();
+                    result.innerHTML = `
+                        <div style="background: rgba(34, 197, 94, 0.3); padding: 15px; border-radius: 8px; margin-top: 15px;">
+                            <strong>✅ 연결 성공!</strong><br>
+                            상태: ${data.status}<br>
+                            서버 시간: ${data.time}<br>
+                            OpenAI: ${data.api_keys.openai ? '✅' : '❌'}<br>
+                            Instagram: ${data.api_keys.instagram ? '✅' : '❌'}
+                        </div>
+                    `;
+                } catch (error) {
+                    result.innerHTML = `
+                        <div style="background: rgba(239, 68, 68, 0.3); padding: 15px; border-radius: 8px; margin-top: 15px;">
+                            ❌ 오류: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+        </script>
+    </body>
+    </html>
+    """)
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
-    """프리미엄 대시보드"""
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request
-    })
+    """대시보드 페이지"""
+    if templates:
+        try:
+            return templates.TemplateResponse("dashboard.html", {
+                "request": request
+            })
+        except Exception as e:
+            print(f"대시보드 템플릿 오류: {e}")
+    
+    return HTMLResponse("""
+    <div style="font-family: Arial; text-align: center; margin-top: 100px;">
+        <h1>대시보드</h1>
+        <p>대시보드 기능을 준비 중입니다...</p>
+        <a href="/" style="color: #667eea; text-decoration: none;">← 홈으로 돌아가기</a>
+    </div>
+    """)
 
-@app.get("/pricing", response_class=HTMLResponse)
-async def pricing_page(request: Request):
-    """가격 정책 페이지"""
-    return templates.TemplateResponse("pricing.html", {
-        "request": request
-    })
+@app.get("/test")
+async def test():
+    """기본 테스트 엔드포인트"""
+    return {
+        "status": "success",
+        "message": "서버 정상 작동",
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "platform": "Railway",
+        "api_keys": {
+            "openai": bool(os.getenv("OPENAI_API_KEY")),
+            "instagram": bool(os.getenv("INSTAGRAM_ACCESS_TOKEN"))
+        }
+    }
 
-@app.get("/features", response_class=HTMLResponse)
-async def features_page(request: Request):
-    """기능 소개 페이지"""
-    return templates.TemplateResponse("features.html", {
-        "request": request
-    })
+# AI 기능 API (안전한 버전)
+@app.get("/api/generate-content")
+async def generate_simple_content(
+    business_name: str = "테스트 비즈니스",
+    industry: str = "restaurant"
+):
+    """간단한 콘텐츠 생성 (AI 없이)"""
+    try:
+        # 산업별 기본 콘텐츠 템플릿
+        templates_dict = {
+            "restaurant": {
+                "caption": f"🍽️ {business_name}에서 특별한 맛을 경험해보세요! 신선한 재료로 정성스럽게 준비한 오늘의 메뉴를 소개합니다.",
+                "hashtags": ["#맛집", "#푸드스타그램", "#맛있어요", "#신메뉴", "#오늘뭐먹지"]
+            },
+            "fashion": {
+                "caption": f"✨ {business_name}의 새로운 컬렉션을 만나보세요! 트렌디하고 스타일리시한 아이템들로 당신만의 스타일을 완성하세요.",
+                "hashtags": ["#패션", "#스타일", "#OOTD", "#신상", "#패션스타그램"]
+            },
+            "beauty": {
+                "caption": f"💄 {business_name}와 함께 더욱 아름다운 당신을 발견하세요! 프리미엄 뷰티 제품으로 자연스러운 아름다움을 연출해보세요.",
+                "hashtags": ["#뷰티", "#화장품", "#스킨케어", "#뷰티스타그램", "#셀프케어"]
+            }
+        }
+        
+        template = templates_dict.get(industry, {
+            "caption": f"🌟 {business_name}와 함께하는 특별한 경험! 고객 만족을 위해 최선을 다하는 저희를 만나보세요.",
+            "hashtags": ["#비즈니스", "#서비스", "#품질", "#고객만족", "#추천"]
+        })
+        
+        return {
+            "success": True,
+            "content": {
+                "caption": template["caption"],
+                "hashtags": template["hashtags"],
+                "full_caption": template["caption"] + "\n\n" + " ".join(template["hashtags"]),
+                "image_url": "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
+            },
+            "message": "콘텐츠가 생성되었습니다! 🎨"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "콘텐츠 생성 중 오류가 발생했습니다."
+        }
 
-# API 엔드포인트들은 다음 아티팩트에서 계속...
+# 실제 AI 기능 (선택적 로드)
+@app.get("/api/generate-ai-content")
+async def generate_ai_content(
+    business_name: str = "테스트 비즈니스",
+    industry: str = "restaurant"
+):
+    """실제 AI 콘텐츠 생성 (OpenAI API 사용)"""
+    try:
+        # AI 시스템을 안전하게 임포트
+        poster_system = None
+        try:
+            from instagram_auto_poster import InstagramAutoPoster
+            poster_system = InstagramAutoPoster()
+        except ImportError as e:
+            return {
+                "success": False,
+                "error": "AI 모듈을 불러올 수 없습니다",
+                "message": "기본 콘텐츠 생성을 사용해주세요."
+            }
+        
+        business_info = {
+            'name': business_name,
+            'industry': industry,
+            'target': '20-30대 고객'
+        }
+        
+        # 실제 AI 콘텐츠 생성
+        content = poster_system.generate_content_with_ai(business_info)
+        
+        return {
+            "success": True,
+            "content": {
+                "caption": content.get('raw_caption', ''),
+                "hashtags": content.get('hashtags', []),
+                "full_caption": content.get('caption', ''),
+                "image_url": "https://images.unsplash.com/photo-1611224923853-80b023f02d71?auto=format&fit=crop&w=1024&q=80"
+            },
+            "message": "AI가 콘텐츠를 생성했습니다! 🤖"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "AI 콘텐츠 생성 중 오류가 발생했습니다."
+        }
 
 if __name__ == "__main__":
     import uvicorn
@@ -340,148 +454,9 @@ if __name__ == "__main__":
     print("=" * 60)
     
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
         port=8000,
         reload=True,
         log_level="info"
     )
-# Vercel 배포를 위한 설정
-if __name__ != "__main__":
-    # Vercel에서 실행될 때
-    app = app
-
-# main.py 맨 아래에 추가/수정
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-
-# 기존 코드는 그대로 두고, 맨 아래에 이것만 추가:
-
-# Vercel용 핸들러
-def handler(request):
-    """Vercel serverless function handler"""
-    return app
-
-# Vercel 배포를 위한 앱 내보내기
-app_for_vercel = app
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
-
-
-
- # main.py에 새로운 API 엔드포인트 추가
-
-@app.post("/api/generate-real-content")
-async def generate_real_content(
-    business_name: str = "테스트 비즈니스",
-    industry: str = "restaurant",
-    current_user: dict = Depends(get_current_user) if 'get_current_user' in globals() else None
-):
-    """실제 AI로 콘텐츠 생성"""
-    try:
-        business_info = {
-            'name': business_name,
-            'industry': industry,
-            'target': '20-30대 고객'
-        }
-        
-        # 실제 AI 콘텐츠 생성
-        content = poster_system.generate_content_with_ai(business_info)
-        
-        # 실제 DALL-E 이미지 생성
-        image_description = f"{industry} business marketing content"
-        image_url = poster_system.generate_image_with_dalle(image_description)
-        
-        return {
-            "success": True,
-            "content": {
-                "caption": content['raw_caption'],
-                "hashtags": content['hashtags'],
-                "full_caption": content['caption'],
-                "image_url": image_url
-            },
-            "message": "실제 AI가 콘텐츠를 생성했습니다! 🎨"
-        }
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "message": "AI 콘텐츠 생성 중 오류가 발생했습니다."
-        }
-
-@app.post("/api/post-to-instagram-real")
-async def post_to_instagram_real(
-    business_name: str = "Instagram AI Bot",
-    industry: str = "marketing"
-):
-    """실제 Instagram에 포스팅"""
-    try:
-        business_info = {
-            'name': business_name,
-            'industry': industry,
-            'target': '소상공인 및 마케터'
-        }
-        
-        # 실제 Instagram 포스팅
-        post_id = poster_system.post_to_instagram(business_info)
-        
-        if post_id:
-            return {
-                "success": True,
-                "post_id": post_id,
-                "message": f"Instagram에 성공적으로 포스팅되었습니다! 🎉",
-                "instagram_url": f"https://www.instagram.com/p/{post_id}/"
-            }
-        else:
-            return {
-                "success": False,
-                "message": "Instagram 포스팅에 실패했습니다."
-            }
-            
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "message": "포스팅 중 오류가 발생했습니다."
-        }
-
-@app.get("/api/test-connections")
-async def test_connections():
-    """API 연결 상태 테스트"""
-    results = {
-        "openai": False,
-        "instagram": False,
-        "errors": []
-    }
-    
-    # OpenAI 테스트
-    try:
-        if openai_client:
-            test_response = openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=10
-            )
-            results["openai"] = True
-        else:
-            results["errors"].append("OpenAI API 키가 설정되지 않았습니다")
-    except Exception as e:
-        results["errors"].append(f"OpenAI 오류: {str(e)}")
-    
-    # Instagram 테스트
-    try:
-        account_info = poster_system.get_account_info()
-        if account_info:
-            results["instagram"] = True
-            results["instagram_info"] = account_info
-        else:
-            results["errors"].append("Instagram 계정 정보를 가져올 수 없습니다")
-    except Exception as e:
-        results["errors"].append(f"Instagram 오류: {str(e)}")
-    
-    return results   
