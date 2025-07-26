@@ -16,6 +16,20 @@ import os
 import asyncio
 from pathlib import Path
 
+# main.py 상단에 추가 (기존 import 아래)
+from instagram_auto_poster import InstagramAutoPoster
+import os
+from openai import OpenAI
+
+# 시스템 초기화 (app 생성 후에 추가)
+poster_system = InstagramAutoPoster()
+
+# OpenAI 클라이언트 직접 초기화
+openai_client = None
+if os.getenv("OPENAI_API_KEY"):
+    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
 # 프로젝트 구조 생성
 def create_project_structure():
     """프로젝트 디렉토리 구조 생성"""
@@ -336,3 +350,138 @@ if __name__ == "__main__":
 if __name__ != "__main__":
     # Vercel에서 실행될 때
     app = app
+
+# main.py 맨 아래에 추가/수정
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+
+# 기존 코드는 그대로 두고, 맨 아래에 이것만 추가:
+
+# Vercel용 핸들러
+def handler(request):
+    """Vercel serverless function handler"""
+    return app
+
+# Vercel 배포를 위한 앱 내보내기
+app_for_vercel = app
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+
+
+ # main.py에 새로운 API 엔드포인트 추가
+
+@app.post("/api/generate-real-content")
+async def generate_real_content(
+    business_name: str = "테스트 비즈니스",
+    industry: str = "restaurant",
+    current_user: dict = Depends(get_current_user) if 'get_current_user' in globals() else None
+):
+    """실제 AI로 콘텐츠 생성"""
+    try:
+        business_info = {
+            'name': business_name,
+            'industry': industry,
+            'target': '20-30대 고객'
+        }
+        
+        # 실제 AI 콘텐츠 생성
+        content = poster_system.generate_content_with_ai(business_info)
+        
+        # 실제 DALL-E 이미지 생성
+        image_description = f"{industry} business marketing content"
+        image_url = poster_system.generate_image_with_dalle(image_description)
+        
+        return {
+            "success": True,
+            "content": {
+                "caption": content['raw_caption'],
+                "hashtags": content['hashtags'],
+                "full_caption": content['caption'],
+                "image_url": image_url
+            },
+            "message": "실제 AI가 콘텐츠를 생성했습니다! 🎨"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "AI 콘텐츠 생성 중 오류가 발생했습니다."
+        }
+
+@app.post("/api/post-to-instagram-real")
+async def post_to_instagram_real(
+    business_name: str = "Instagram AI Bot",
+    industry: str = "marketing"
+):
+    """실제 Instagram에 포스팅"""
+    try:
+        business_info = {
+            'name': business_name,
+            'industry': industry,
+            'target': '소상공인 및 마케터'
+        }
+        
+        # 실제 Instagram 포스팅
+        post_id = poster_system.post_to_instagram(business_info)
+        
+        if post_id:
+            return {
+                "success": True,
+                "post_id": post_id,
+                "message": f"Instagram에 성공적으로 포스팅되었습니다! 🎉",
+                "instagram_url": f"https://www.instagram.com/p/{post_id}/"
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Instagram 포스팅에 실패했습니다."
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "포스팅 중 오류가 발생했습니다."
+        }
+
+@app.get("/api/test-connections")
+async def test_connections():
+    """API 연결 상태 테스트"""
+    results = {
+        "openai": False,
+        "instagram": False,
+        "errors": []
+    }
+    
+    # OpenAI 테스트
+    try:
+        if openai_client:
+            test_response = openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Hello"}],
+                max_tokens=10
+            )
+            results["openai"] = True
+        else:
+            results["errors"].append("OpenAI API 키가 설정되지 않았습니다")
+    except Exception as e:
+        results["errors"].append(f"OpenAI 오류: {str(e)}")
+    
+    # Instagram 테스트
+    try:
+        account_info = poster_system.get_account_info()
+        if account_info:
+            results["instagram"] = True
+            results["instagram_info"] = account_info
+        else:
+            results["errors"].append("Instagram 계정 정보를 가져올 수 없습니다")
+    except Exception as e:
+        results["errors"].append(f"Instagram 오류: {str(e)}")
+    
+    return results   

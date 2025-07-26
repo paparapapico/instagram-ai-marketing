@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 Instagram AI Marketing Automation Platform
 
 AI 기반 Instagram 마케팅 자동화 플랫폼입니다. GPT-4와 DALL-E를 활용한 콘텐츠 자동 생성, 스마트 스케줄링, 실시간 분석을 제공합니다.
@@ -286,3 +287,6 @@ MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
 ---
 
 Made with ❤️ by AI & Human Collaboration
+=======
+# instagram-ai-marketing
+>>>>>>> f8c90708105d8ac48ed9fa77b47be5465eb1a6a9
