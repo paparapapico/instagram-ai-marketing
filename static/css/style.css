@@ -1,0 +1,14 @@
+:root {
+    --primary-color: #6366f1;
+    --secondary-color: #ec4899;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border: none;
+}
+
+.card {
+    border-radius: 16px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
