@@ -1,22 +1,26 @@
+# 데이터베이스 관련 유틸리티
 import sqlite3
-from contextlib import contextmanager
 
-@contextmanager
-def get_db_connection(db_path="instagram_marketing.db"):
-    """데이터베이스 연결 컨텍스트 매니저"""
-    conn = sqlite3.connect(db_path)
-    try:
-        yield conn
-    finally:
-        conn.close()
+def get_db_connection():
+    """데이터베이스 연결"""
+    conn = sqlite3.connect('instagram_marketing.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
-def execute_query(query, params=None, db_path="instagram_marketing.db"):
-    """쿼리 실행 유틸리티"""
-    with get_db_connection(db_path) as conn:
-        cursor = conn.cursor()
-        if params:
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-        conn.commit()
-        return cursor.fetchall()
+def init_database():
+    """데이터베이스 초기화"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 사용자 테이블 생성
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()

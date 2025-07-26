@@ -4,34 +4,8 @@ services:
   web:
     build: .
     ports:
-      - "8000:8000"
+      - "5000:5000"
     volumes:
       - .:/app
-      - ./data:/app/data
     environment:
-      - DEBUG=True
-    depends_on:
-      - redis
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-  scheduler:
-    build: .
-    command: python scheduler.py
-    volumes:
-      - .:/app
-      - ./data:/app/data
-    depends_on:
-      - web
-      - redis
-    restart: unless-stopped
-
-volumes:
-  redis_data:
+      - FLASK_ENV=development
