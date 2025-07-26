@@ -149,6 +149,15 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         "type": "access"
     })
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+# 기존 유틸리티 함수들 아래에 추가
+def verify_password(password: str, hashed: str) -> bool:
+    """비밀번호 검증"""
+    try:
+        import bcrypt
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except ImportError:
+        import hashlib
+        return hashlib.sha256(password.encode()).hexdigest() == hashed
 
 # 시작 이벤트
 @app.on_event("startup")
@@ -351,12 +360,148 @@ async def test():
         }
     }
 
+# 기존 @app.get("/api/generate-content") 위에 추가
+
+@app.post("/api/login")
+async def login_user(user: UserLogin):
+    """사용자 로그인"""
+    try:
+        conn = sqlite3.connect("instagram_marketing.db")
+        cursor = conn.cursor()
+        
+        # 사용자 확인 및 비즈니스 정보 가져오기
+        cursor.execute('''
+            SELECT u.id, u.password_hash, u.full_name, u.email,
+                   b.id as business_id, b.business_name, b.subscription_plan
+            FROM users u
+            LEFT JOIN businesses b ON u.id = b.user_id
+            WHERE u.email = ? AND u.is_active = TRUE
+        ''', (user.email,))
+        
+        result = cursor.fetchone()
+        if not result or not verify_password(user.password, result[1]):
+            raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 올바르지 않습니다")
+        
+        user_id, _, full_name, email, business_id, business_name, plan = result
+        
+        # 마지막 로그인 시간 업데이트
+        cursor.execute('''
+            UPDATE users SET last_login = ? WHERE id = ?
+        ''', (datetime.now().isoformat(), user_id))
+        
+        # JWT 토큰 생성
+        access_token = create_access_token({
+            "user_id": user_id,
+            "business_id": business_id,
+            "email": email
+        })
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            "success": True,
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user_id,
+                "email": email,
+                "full_name": full_name,
+                "business_name": business_name,
+                "subscription_plan": plan
+            },
+            "business_id": business_id,
+            "message": f"안녕하세요, {business_name}님! 👋"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"로그인 중 오류가 발생했습니다: {str(e)}")
+
+@app.post("/api/register")
+async def register_user(user: UserCreate):
+    """사용자 회원가입"""
+    try:
+        conn = sqlite3.connect("instagram_marketing.db")
+        cursor = conn.cursor()
+        
+        # 이메일 중복 확인
+        cursor.execute("SELECT id FROM users WHERE email = ?", (user.email,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="이미 등록된 이메일입니다")
+        
+        # 사용자 등록
+        password_hash = hash_password(user.password)
+        cursor.execute('''
+            INSERT INTO users (email, password_hash, full_name)
+            VALUES (?, ?, ?)
+        ''', (user.email, password_hash, user.business_name))
+        
+        user_id = cursor.lastrowid
+        
+        # 비즈니스 정보 등록
+        cursor.execute('''
+            INSERT INTO businesses (
+                user_id, business_name, industry, target_audience, 
+                brand_voice, phone, website, subscription_plan, monthly_fee
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            user_id, user.business_name, user.industry, user.target_audience,
+            user.brand_voice, user.phone, user.website, 'basic', 150000
+        ))
+        
+        business_id = cursor.lastrowid
+        
+        # JWT 토큰 생성
+        access_token = create_access_token({
+            "user_id": user_id, 
+            "business_id": business_id,
+            "email": user.email
+        })
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            "success": True,
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user_id,
+                "email": user.email,
+                "business_name": user.business_name
+            },
+            "business_id": business_id,
+            "message": "회원가입이 완료되었습니다! 🎉"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
 # AI 기능 API (안전한 버전)
-@app.get("/api/generate-content")
-async def generate_simple_content(
-    business_name: str = "테스트 비즈니스",
-    industry: str = "restaurant"
-):
+@app.get("/api/dashboard-data")
+async def get_dashboard_data():
+    """대시보드 기본 데이터"""
+    return {
+        "success": True,
+        "business": {
+            "name": "테스트 비즈니스",
+            "industry": "software",
+            "plan": "basic",
+            "monthly_fee": 150000
+        },
+        "stats": {
+            "monthly_posts": 12,
+            "published_posts": 8,
+            "scheduled_posts": 4,
+            "avg_engagement": 5.2
+        }
+    }
+
+
     """간단한 콘텐츠 생성 (AI 없이)"""
     try:
         # 산업별 기본 콘텐츠 템플릿
