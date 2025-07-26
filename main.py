@@ -13,6 +13,8 @@ import jwt
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 # 프로젝트 구조 생성
 def create_project_structure():
@@ -442,6 +444,10 @@ async def generate_ai_content(
             "error": str(e),
             "message": "AI 콘텐츠 생성 중 오류가 발생했습니다."
         }
+
+@app.get("/")
+async def read_root():
+    return FileResponse("templates/landing.html")
 
 if __name__ == "__main__":
     import uvicorn
