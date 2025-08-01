@@ -17,7 +17,10 @@ import asyncio
 import logging
 import openai
 import jwt
+import random
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 # 환경변수 로드
 try:
@@ -293,75 +296,156 @@ class AIContentGenerator:
         self.openai_client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         self.unsplash_key = os.getenv('UNSPLASH_ACCESS_KEY')
         
+        # 2025년 최신 트렌드 및 밈
+        self.trend_keywords = {
+            'restaurant': ['맛도리', '존맛탱', '핫플', '웨이팅', 'JMT', '맛집투어', '찐맛집', '로컬맛집', '숨은맛집'],
+            'fashion': ['코디', 'OOTD', '룩북', '하울', '데일리룩', '캐주얼', '스트릿', '미니멀', 'Y2K'],
+            'beauty': ['글로우', '속광', '톤업', '꿀피부', '데일리', '겟레디윗미', 'GRWM', '화장품추천', '신상템'],
+            'fitness': ['오운완', '헬린이', '벌크업', '다이어트', '홈트', '바디프로필', '운동인증', '헬스타그램']
+        }
+        
+        # 최신 이모지 스타일
+        self.emoji_sets = {
+            'restaurant': ['🍽️', '🥘', '😋', '🤤', '👨‍🍳', '🔥', '✨', '💯', '🎉', '📍'],
+            'fashion': ['👗', '👠', '👜', '💄', '✨', '🛍️', '💫', '🌟', '💖', '🔥'],
+            'beauty': ['💄', '✨', '🌸', '💕', '🌟', '💫', '🦋', '🌺', '💖', '🎀'],
+            'fitness': ['💪', '🏃‍♀️', '🔥', '💯', '⚡', '🎯', '💦', '🏋️‍♀️', '📈', '✅']
+        }
+        
     async def generate_content(self, business_info: Dict) -> Dict:
-        """AI 콘텐츠 생성"""
+        """AI 콘텐츠 생성 - 트렌디하고 실제적인 버전"""
         try:
-            # GPT-3.5로 콘텐츠 생성
-            prompt = self._create_prompt(business_info)
+            # 더 스마트한 프롬프트 생성
+            prompt = self._create_trendy_prompt(business_info)
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",  # 더 나은 모델 사용 (가능하면)
                 messages=[
-                    {"role": "system", "content": "당신은 Instagram 마케팅 전문가입니다."},
+                    {
+                        "role": "system", 
+                        "content": """당신은 2025년 한국 인스타그램 마케팅 전문가입니다. 
+                        MZ세대의 언어와 최신 트렌드를 완벽하게 이해하고 있으며, 
+                        실제로 인기를 끌 수 있는 콘텐츠를 작성합니다.
+                        자연스럽고 친근한 말투로 작성하되, 과하지 않게 적절히 트렌디한 표현을 사용합니다."""
+                    },
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=600,
-                temperature=0.8
+                max_tokens=800,
+                temperature=0.9  # 더 창의적인 결과
             )
             
             content_text = response.choices[0].message.content.strip()
             
-            # JSON 파싱 시도
+            # JSON 파싱
             try:
                 content_data = json.loads(content_text)
             except:
-                # JSON 파싱 실패시 기본값
-                content_data = {
-                    'caption': content_text[:200],
-                    'hashtags': self._get_default_hashtags(business_info['industry'])
-                }
+                # 파싱 실패시 재시도
+                content_data = self._parse_content_fallback(content_text, business_info)
             
-            # 이미지 선택
-            image_url = await self._get_image(business_info['industry'])
+            # 업종에 맞는 실제 이미지 검색
+            image_url = await self._get_trendy_image(business_info)
+            
+            # 시간대별 해시태그 추가
+            time_hashtags = self._get_time_based_hashtags()
+            all_hashtags = content_data.get('hashtags', []) + time_hashtags
             
             return {
                 'caption': content_data.get('caption', ''),
-                'hashtags': content_data.get('hashtags', []),
+                'hashtags': all_hashtags[:15],  # 최대 15개
                 'image_url': image_url,
-                'full_caption': f"{content_data.get('caption', '')}\n\n{' '.join(content_data.get('hashtags', []))}"
+                'full_caption': f"{content_data.get('caption', '')}\n\n{' '.join(all_hashtags[:15])}",
+                'engagement_tip': content_data.get('engagement_tip', '')
             }
             
         except Exception as e:
             logger.error(f"콘텐츠 생성 오류: {e}")
-            return self._get_fallback_content(business_info)
+            return self._get_trendy_fallback_content(business_info)
     
-    def _create_prompt(self, business_info: Dict) -> str:
-        """프롬프트 생성"""
+    def _create_trendy_prompt(self, business_info: Dict) -> str:
+        """트렌디한 프롬프트 생성"""
+        industry = business_info['industry']
+        trends = self.trend_keywords.get(industry, [])
+        current_month = datetime.now().strftime("%m월")
+        
         return f"""
 비즈니스: {business_info['business_name']}
-업종: {business_info['industry']}
-타겟: {business_info.get('target_audience', '일반 고객')}
-톤: {business_info.get('brand_voice', '친근하고 전문적인')}
+업종: {industry}
+타겟: {business_info.get('target_audience', '20-30대 MZ세대')}
+현재: {current_month}
 
-Instagram 포스트용 콘텐츠를 JSON 형식으로 생성해주세요:
+다음 요구사항에 맞춰 인스타그램 콘텐츠를 생성해주세요:
+
+1. 2025년 최신 인스타그램 트렌드를 반영할 것
+2. 실제로 사람들이 좋아요와 댓글을 남길만한 내용
+3. 자연스럽고 친근한 한국어 (과하지 않게)
+4. 업종 관련 트렌드 키워드 활용: {', '.join(trends)}
+5. 적절한 이모지 사용 (2-4개)
+6. CTA(Call to Action) 포함
+
+JSON 형식으로 응답:
 {{
-    "caption": "매력적인 캡션 (150-200자)",
-    "hashtags": ["해시태그1", "해시태그2", ...] (8-10개)
+    "caption": "매력적이고 트렌디한 캡션 (100-150자, 줄바꿈 포함)",
+    "hashtags": ["트렌디한_해시태그1", "해시태그2", ...] (10-12개),
+    "engagement_tip": "참여 유도 문구"
 }}
+
+예시 스타일:
+- "오늘 점심 뭐 드셨나요? 🤔"
+- "이거 실화냐... 진짜 맛있음 ㅠㅠ"
+- "요즘 핫한 OO 다녀왔는데"
+- "솔직 후기) OO 써본 썰.txt"
 """
     
-    async def _get_image(self, industry: str) -> str:
-        """업종별 이미지 선택"""
-        # Unsplash API 사용 시도
+    async def _get_trendy_image(self, business_info: Dict) -> str:
+        """업종별 트렌디한 이미지 검색"""
+        industry = business_info['industry']
+        
+        # 업종별 구체적인 검색 키워드
+        search_queries = {
+            'restaurant': [
+                f"korean {business_info['business_name']} food aesthetic",
+                "instagram worthy cafe food",
+                "trendy restaurant interior 2025",
+                "korean food photography",
+                "seoul cafe aesthetic"
+            ],
+            'fashion': [
+                "korean fashion street style 2025",
+                "seoul fashion week street",
+                "k-fashion outfit aesthetic",
+                "trendy korean fashion store",
+                "minimalist fashion photography"
+            ],
+            'beauty': [
+                "korean beauty products aesthetic",
+                "k-beauty skincare flatlay",
+                "seoul beauty store interior",
+                "glass skin makeup result",
+                "korean cosmetics photography"
+            ],
+            'fitness': [
+                "modern gym interior design",
+                "fitness motivation aesthetic",
+                "korean gym equipment",
+                "workout results transformation",
+                "seoul fitness studio"
+            ]
+        }
+        
         if self.unsplash_key:
             try:
+                # 여러 쿼리 중 랜덤 선택
+                query = random.choice(search_queries.get(industry, ["lifestyle"]))
+                
                 response = requests.get(
                     "https://api.unsplash.com/search/photos",
                     params={
-                        'query': industry,
-                        'per_page': 10,
+                        'query': query,
+                        'per_page': 30,
                         'orientation': 'square',
-                        'client_id': self.unsplash_key
+                        'client_id': self.unsplash_key,
+                        'order_by': 'relevant'
                     },
                     timeout=10
                 )
@@ -369,48 +453,147 @@ Instagram 포스트용 콘텐츠를 JSON 형식으로 생성해주세요:
                 if response.status_code == 200:
                     data = response.json()
                     if data['results']:
-                        return data['results'][0]['urls']['regular']
-            except:
-                pass
+                        # 상위 5개 중 랜덤 선택 (다양성)
+                        top_results = data['results'][:5]
+                        selected = random.choice(top_results)
+                        return selected['urls']['regular']
+            except Exception as e:
+                logger.error(f"이미지 검색 오류: {e}")
         
-        # 폴백 이미지
-        fallback_images = {
-            'restaurant': "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1024&q=80",
-            'fashion': "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1024&q=80",
-            'beauty': "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1024&q=80",
-            'fitness': "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=1024&q=80"
-        }
-        
-        return fallback_images.get(industry, fallback_images['restaurant'])
+        # Pexels API 폴백 (무료)
+        return self._get_pexels_image(industry, business_info)
     
-    def _get_default_hashtags(self, industry: str) -> List[str]:
-        """기본 해시태그"""
-        hashtags = {
-            'restaurant': ['#맛집', '#맛스타그램', '#음식', '#카페', '#레스토랑', '#분위기좋은곳', '#데이트코스', '#맛있다'],
-            'fashion': ['#패션', '#스타일', '#ootd', '#fashion', '#코디', '#옷스타그램', '#트렌드', '#스타일링'],
-            'beauty': ['#뷰티', '#화장품', '#beauty', '#스킨케어', '#메이크업', '#뷰티팁', '#피부관리', '#자연스러운'],
-            'fitness': ['#피트니스', '#운동', '#헬스', '#fitness', '#다이어트', '#건강', '#트레이닝', '#홈트']
+    def _get_pexels_image(self, industry: str, business_info: Dict) -> str:
+        """Pexels API를 통한 이미지 검색 (폴백)"""
+        # 실제로는 Pexels API 키가 필요하지만, 데모용 고품질 이미지 URL 반환
+        quality_images = {
+            'restaurant': [
+                "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1024&q=80"
+            ],
+            'fashion': [
+                "https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1024&q=80"
+            ],
+            'beauty': [
+                "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=1024&q=80"
+            ],
+            'fitness': [
+                "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1024&q=80",
+                "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=1024&q=80"
+            ]
         }
         
-        return hashtags.get(industry, hashtags['restaurant'])
+        return random.choice(quality_images.get(industry, quality_images['restaurant']))
     
-    def _get_fallback_content(self, business_info: Dict) -> Dict:
-        """폴백 콘텐츠"""
-        captions = {
-            'restaurant': f"🍽️ {business_info['business_name']}에서 특별한 맛의 경험을 즐겨보세요!",
-            'fashion': f"✨ {business_info['business_name']}의 새로운 컬렉션을 만나보세요!",
-            'beauty': f"💄 {business_info['business_name']}과 함께 더 아름다운 당신을 발견하세요!",
-            'fitness': f"💪 {business_info['business_name']}에서 건강한 삶을 시작하세요!"
+    def _get_time_based_hashtags(self) -> List[str]:
+        """시간대별 해시태그"""
+        hour = datetime.now().hour
+        day_of_week = datetime.now().strftime("%A")
+        
+        time_tags = []
+        
+        # 시간대별
+        if 6 <= hour < 10:
+            time_tags.extend(['#굿모닝', '#아침스타그램', '#모닝루틴'])
+        elif 11 <= hour < 14:
+            time_tags.extend(['#점심스타그램', '#런치타임', '#점심뭐먹지'])
+        elif 17 <= hour < 20:
+            time_tags.extend(['#퇴근', '#저녁스타그램', '#오늘하루'])
+        elif 21 <= hour < 24:
+            time_tags.extend(['#밤스타그램', '#불금', '#힐링타임'])
+        
+        # 요일별
+        if day_of_week in ['Friday', 'Saturday']:
+            time_tags.extend(['#불금', '#주말', '#주말스타그램'])
+        elif day_of_week == 'Monday':
+            time_tags.extend(['#월요병', '#한주시작', '#월요일'])
+        
+        return time_tags
+    
+    def _get_trendy_fallback_content(self, business_info: Dict) -> Dict:
+        """트렌디한 폴백 콘텐츠"""
+        industry = business_info['industry']
+        business_name = business_info['business_name']
+        emojis = self.emoji_sets.get(industry, ['✨'])
+        
+        trendy_templates = {
+            'restaurant': [
+                f"{random.choice(emojis)} 요즘 {business_name} 안 가본 사람 있나요?\n진짜 맛도리 맛집인데... 🤤\n\n특히 시그니처 메뉴는 꼭 드셔보세요!\n(스토리에 더 많은 사진 있어요 📸)",
+                f"오늘 점메추 해결! {random.choice(emojis)}\n\n{business_name}에서 JMT 발견...\n이거 실화냐 진짜 너무 맛있음 ㅠㅠ\n\n💬 댓글로 메뉴 추천 받아요!",
+                f"📍 {business_name}\n\n요즘 핫한 맛집 다녀왔는데\n분위기도 미쳤고 맛도 미쳤음... {random.choice(emojis)}\n\n웨이팅 있지만 기다릴 가치 충분!"
+            ],
+            'fashion': [
+                f"오늘의 #OOTD {random.choice(emojis)}\n\n{business_name}에서 득템한 아이템으로\n데일리룩 완성! 💫\n\n사이즈 문의는 DM 주세요 🛍️",
+                f"신상 입고 소식! {random.choice(emojis)}\n\n{business_name} 이번 컬렉션\n진짜 예쁜 거 너무 많아요... 💖\n\n✔️ 온라인 주문 가능\n✔️ 당일 발송",
+                f"룩북 촬영 비하인드 📸\n\n{business_name} 새로운 시즌 준비중!\n미리보기로 보여드려요 {random.choice(emojis)}\n\n어떤 스타일이 제일 예쁜가요?"
+            ],
+            'beauty': [
+                f"#광고 #협찬\n\n{business_name} 신제품 써봤는데 {random.choice(emojis)}\n속광 피부 만들기 대성공... ✨\n\n지금 할인 중이래요! (링크는 프로필에)",
+                f"요즘 피부 좋아졌다는 말 많이 듣는데 {random.choice(emojis)}\n\n비결은 {business_name} 제품!\n#GRWM 영상은 릴스에 있어요 💕",
+                f"솔직 후기) {business_name} 제품 한달 사용 {random.choice(emojis)}\n\n✅ 장점: 순하고 효과 좋음\n✅ 단점: 너무 빨리 떨어짐 ㅠㅠ\n\n결론: 재구매 의사 100%"
+            ],
+            'fitness': [
+                f"#오운완 {random.choice(emojis)}\n\n{business_name}에서 PT 받는 중!\n확실히 전문가한테 배우니까 다르네요 💪\n\n💬 운동 루틴 궁금하면 댓글 남겨주세요",
+                f"3개월 전 vs 오늘 {random.choice(emojis)}\n\n{business_name} 다닌 결과...\n진짜 인생이 바뀜 💯\n\n✔️ 체지방 -5kg\n✔️ 근육량 +3kg",
+                f"헬린이 탈출 성공! 🎉\n\n{business_name} 트레이너님들\n진짜 너무 친절하고 전문적이에요 {random.choice(emojis)}\n\n무료 상담 받아보세요! (DM 문의)"
+            ]
         }
         
-        caption = captions.get(business_info['industry'], f"✨ {business_info['business_name']}과 함께하세요!")
-        hashtags = self._get_default_hashtags(business_info['industry'])
+        caption = random.choice(trendy_templates.get(industry, trendy_templates['restaurant']))
+        hashtags = self._get_default_trendy_hashtags(industry)
         
         return {
             'caption': caption,
             'hashtags': hashtags,
-            'image_url': "https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1024&q=80",
-            'full_caption': f"{caption}\n\n{' '.join(hashtags)}"
+            'image_url': self._get_pexels_image(industry, business_info),
+            'full_caption': f"{caption}\n\n{' '.join(hashtags)}",
+            'engagement_tip': "스토리에 투표 스티커 추가하면 참여율 UP! 📊"
+        }
+    
+    def _get_default_trendy_hashtags(self, industry: str) -> List[str]:
+        """트렌디한 기본 해시태그"""
+        base_tags = ['#일상', '#데일리', '#추천', '#인스타그램', f'#2025']
+        
+        industry_tags = {
+            'restaurant': ['#맛집', '#맛스타그램', '#JMT', '#존맛', '#맛집투어', '#푸드스타그램', '#먹스타그램', '#카페투어', '#핫플레이스'],
+            'fashion': ['#패션', '#옷스타그램', '#OOTD', '#데일리룩', '#코디', '#패션스타그램', '#스타일', '#룩북', '#신상'],
+            'beauty': ['#뷰티', '#뷰티스타그램', '#화장품', '#스킨케어', '#메이크업', '#뷰티템', '#광고', '#꿀템', '#뷰티인플루언서'],
+            'fitness': ['#운동', '#헬스타그램', '#오운완', '#운동스타그램', '#피트니스', '#다이어트', '#바디프로필', '#운동하는여자', '#헬스']
+        }
+        
+        return base_tags + industry_tags.get(industry, industry_tags['restaurant'])
+    
+    def _parse_content_fallback(self, content_text: str, business_info: Dict) -> Dict:
+        """JSON 파싱 실패시 대체 파싱"""
+        lines = content_text.strip().split('\n')
+        caption = ""
+        hashtags = []
+        
+        for line in lines:
+            if line.strip().startswith('#'):
+                # 해시태그 라인
+                tags = [tag.strip() for tag in line.split() if tag.startswith('#')]
+                hashtags.extend(tags)
+            elif line.strip():
+                # 캡션 라인
+                caption += line + "\n"
+        
+        if not caption:
+            caption = lines[0] if lines else f"{business_info['business_name']}과 함께하는 특별한 순간 ✨"
+        
+        if not hashtags:
+            hashtags = self._get_default_trendy_hashtags(business_info['industry'])
+        
+        return {
+            'caption': caption.strip(),
+            'hashtags': hashtags[:15],
+            'engagement_tip': '스토리 멘션하면 리포스트 해드려요! 🎁'
         }
 
 # FastAPI 앱
