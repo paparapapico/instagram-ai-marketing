@@ -232,6 +232,13 @@ class InstagramService:
             
         url = f"{self.base_url}/{self.api_version}/{self.business_account_id}/media"
         
+        # 디버깅: 요청 정보 출력
+        logger.info(f"📱 Instagram API 호출:")
+        logger.info(f"  - URL: {url}")
+        logger.info(f"  - Business Account ID: {self.business_account_id}")
+        logger.info(f"  - Access Token (처음 20자): {self.access_token[:20] if self.access_token else 'None'}...")
+        logger.info(f"  - Access Token 길이: {len(self.access_token) if self.access_token else 0}")
+        
         params = {
             'image_url': image_url,
             'caption': caption[:2200],  # Instagram 캡션 길이 제한
