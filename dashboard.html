@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대시보드 - Instagram AI Marketing</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .instagram-preview {
+            max-width: 375px;
+            margin: 0 auto;
+            border: 1px solid #dbdbdb;
+            border-radius: 12px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .instagram-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #efefef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .profile-pic {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .instagram-image {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+        
+        .instagram-actions {
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .instagram-content {
+            padding: 0 16px 16px;
+        }
+        
+        .instagram-caption {
+            font-size: 14px;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+        
+        .instagram-hashtags {
+            font-size: 13px;
+            color: #00376b;
+            line-height: 1.3;
+        }
+        
+        .content-editor {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .floating-preview {
+            position: sticky;
+            top: 20px;
+        }
+        
+        .content-stats {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-card {
+            transition: transform 0.2s ease;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .loading .loading-spinner {
+            display: inline-block;
+        }
+        
+        .loading .button-text {
+            display: none;
+        }
+        
+        .badge-custom {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- 네비게이션 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                🚀 Instagram AI Marketing
+            </a>
+            
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <span id="user-name">사용자</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="showProfile()">👤 프로필</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="showSettings()">⚙️ 설정</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="logout()">🚪 로그아웃</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <div class="row">
+            <!-- 메인 콘텐츠 영역 -->
+            <div class="col-lg-8">
+                <!-- 콘텐츠 생성 카드 -->
+                <div class="card feature-card mb-4">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">🤖 AI 콘텐츠 생성</h5>
+                        <span class="badge-custom">GPT-3.5</span>
+                    </div>
+                    <div class="card-body">
+                        <form id="content-form">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="business-name" class="form-label fw-bold">비즈니스 이름</label>
+                                    <input type="text" class="form-control" id="business-name" name="business-name" required placeholder="예: 홍길동카페">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="industry" class="form-label fw-bold">업종</label>
+                                    <select class="form-select" id="industry" name="industry" required>
+                                        <option value="">업종 선택</option>
+                                        <option value="restaurant">🍽️ 음식점/카페</option>
+                                        <option value="fashion">👔 패션/의류</option>
+                                        <option value="beauty">💄 뷰티/화장품</option>
+                                        <option value="fitness">💪 피트니스/헬스</option>
+                                        <option value="retail">🛍️ 소매/쇼핑</option>
+                                        <option value="tech">💻 IT/테크</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">타겟 고객</label>
+                                    <input type="text" class="form-control" id="target" placeholder="20-30대 직장인">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="brand-voice" class="form-label fw-bold">브랜드 톤</label>
+                                    <select class="form-select" id="brand-voice" name="brand-voice" required>
+                                        <option value="">브랜드 톤 선택</option>
+                                        <option value="친근하고 따뜻한">친근하고 따뜻한</option>
+                                        <option value="전문적이고 신뢰감 있는">전문적이고 신뢰감 있는</option>
+                                        <option value="젊고 트렌디한">젊고 트렌디한</option>
+                                        <option value="고급스럽고 세련된">고급스럽고 세련된</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <span class="loading-spinner spinner-border spinner-border-sm me-2"></span>
+                                        <span class="button-text">🎨 콘텐츠 생성</span>
+                                    </button>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="button" class="btn btn-success w-100" onclick="regenerateContent()">
+                                        <span class="loading-spinner spinner-border spinner-border-sm me-2"></span>
+                                        <span class="button-text">🔄 다시 생성</span>
+                                    </button>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="button" class="btn btn-warning w-100" onclick="postToInstagram()" disabled id="post-btn">
+                                        <span class="loading-spinner spinner-border spinner-border-sm me-2"></span>
+                                        <span class="button-text">📱 Instagram 포스팅</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 콘텐츠 편집기 -->
+                <div class="card feature-card" id="editor-card" style="display: none;">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">✏️ 콘텐츠 편집</h5>
+                    </div>
+                    <div class="card-body content-editor">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">📝 캡션 편집</label>
+                                <textarea id="caption-editor" class="form-control" rows="8" placeholder="생성된 캡션이 여기에 표시됩니다..."></textarea>
+                                <div class="d-flex justify-content-between mt-2">
+                                    <small class="text-muted">
+                                        <span id="caption-length">0</span>/2200 자
+                                    </small>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="optimizeCaption()">
+                                        ✨ AI 최적화
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">🏷️ 해시태그 편집</label>
+                                <textarea id="hashtags-editor" class="form-control" rows="4" placeholder="#해시태그들이 여기에 표시됩니다..."></textarea>
+                                <div class="d-flex justify-content-between mt-2">
+                                    <small class="text-muted">
+                                        <span id="hashtag-count">0</span>개 해시태그
+                                    </small>
+                                    <button class="btn btn-sm btn-outline-success" onclick="suggestHashtags()">
+                                        🎯 추천 태그
+                                    </button>
+                                </div>
+                                
+                                <!-- 이미지 URL 편집 -->
+                                <div class="mt-3">
+                                    <label class="form-label fw-bold">🖼️ 이미지 URL</label>
+                                    <div class="input-group">
+                                        <input type="url" id="image-url-editor" class="form-control" placeholder="이미지 URL">
+                                        <button class="btn btn-outline-primary" onclick="changeImage()">변경</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <div class="btn-group">
+                                <button class="btn btn-outline-secondary" onclick="resetContent()">
+                                    🔄 초기화
+                                </button>
+                                <button class="btn btn-primary" onclick="updatePreview()">
+                                    👀 미리보기 업데이트
+                                </button>
+                                <button class="btn btn-success" onclick="saveContent()">
+                                    💾 저장하기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 미리보기 및 통계 영역 -->
+            <div class="col-lg-4">
+                <div class="floating-preview">
+                    <!-- Instagram 미리보기 -->
+                    <div class="card feature-card mb-4" id="preview-card" style="display: none;">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0">📱 Instagram 미리보기</h6>
+                        </div>
+                        <div class="card-body text-center">
+                            <div class="instagram-preview">
+                                <!-- Instagram 헤더 -->
+                                <div class="instagram-header">
+                                    <div class="d-flex align-items-center">
+                                        <div class="profile-pic me-2">
+                                            B
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 14px;" id="preview-username">your_business</div>
+                                            <div class="text-muted" style="font-size: 11px;">Sponsored</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-muted">⋯</div>
+                                </div>
+                                
+                                <!-- Instagram 이미지 -->
+                                <img id="preview-image" 
+                                     src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=400&q=80" 
+                                     class="instagram-image"
+                                     alt="Instagram post image">
+                                
+                                <!-- Instagram 액션 버튼 -->
+                                <div class="instagram-actions">
+                                    <span style="font-size: 24px;">🤍</span>
+                                    <span style="font-size: 24px;">💬</span>
+                                    <span style="font-size: 24px;">📤</span>
+                                    <div class="ms-auto">
+                                        <span style="font-size: 24px;">🔖</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Instagram 콘텐츠 -->
+                                <div class="instagram-content">
+                                    <div class="fw-bold mb-1" style="font-size: 14px;">1,234 likes</div>
+                                    <div class="instagram-caption">
+                                        <span class="fw-bold" id="preview-business-name">your_business</span>
+                                        <span id="preview-caption">생성된 캡션이 여기에 표시됩니다...</span>
+                                    </div>
+                                    <div class="instagram-hashtags" id="preview-hashtags">
+                                        #해시태그들이 #여기에 #표시됩니다
+                                    </div>
+                                    <div class="text-muted mt-2" style="font-size: 12px;">2 hours ago</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 콘텐츠 통계 -->
+                    <div class="content-stats mb-4" id="stats-card" style="display: none;">
+                        <h6 class="fw-bold mb-3">📊 콘텐츠 분석</h6>
+                        
+                        <div class="stat-item">
+                            <span>캡션 길이</span>
+                            <span class="fw-bold" id="stat-caption-length">0자</span>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <span>해시태그 수</span>
+                            <span class="fw-bold" id="stat-hashtag-count">0개</span>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <span>예상 도달범위</span>
+                            <span class="fw-bold text-success" id="stat-reach">높음</span>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <span>바이럴 점수</span>
+                            <span class="fw-bold text-primary" id="stat-viral-score">85/100</span>
+                        </div>
+                        
+                        <div class="stat-item">
+                            <span>최적 포스팅 시간</span>
+                            <span class="fw-bold text-info" id="stat-best-time">오후 7시</span>
+                        </div>
+
+                        <div class="mt-3 pt-3 border-top">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-outline-primary btn-sm" onclick="copyContent()">
+                                    📋 전체 복사
+                                </button>
+                                <button class="btn btn-outline-success btn-sm" onclick="schedulePost()">
+                                    ⏰ 예약 포스팅
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 빠른 액션 -->
+                    <div class="card feature-card">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0">⚡ 빠른 액션</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-sm btn-outline-primary" onclick="loadTemplate()">
+                                    📋 템플릿 불러오기
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="showHistory()">
+                                    📚 최근 콘텐츠
+                                </button>
+                                <button class="btn btn-sm btn-outline-info" onclick="testInstagram()">
+                                    🧪 Instagram 테스트
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="showAnalytics()">
+                                    📈 성과 분석
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 알림 컨테이너 -->
+    <div id="toast-container" class="position-fixed bottom-0 end-0 p-3" style="z-index: 11"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 전역 변수
+        let currentContent = {
+            caption: '',
+            hashtags: [],
+            imageUrl: '',
+            businessName: ''
+        };
+
+        // 페이지 로드시 사용자 정보 확인
+        document.addEventListener('DOMContentLoaded', async function() {
+            await checkAuth();
+            loadUserInfo();
+        });
+
+        // 인증 확인
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/me');
+                if (!response.ok) {
+                    window.location.href = '/login';
+                    return;
+                }
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('user-name').textContent = data.user.business_name;
+                    document.getElementById('business-name').value = data.user.business_name;
+                    document.getElementById('industry').value = data.user.industry;
+                }
+            } catch (error) {
+                console.error('인증 확인 오류:', error);
+                window.location.href = '/login';
+            }
+        }
+
+        // 사용자 정보 로드
+        function loadUserInfo() {
+            // 사용자별 설정 로드할 수 있음
+        }
+
+        // 콘텐츠 생성 폼 처리
+        document.getElementById('content-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await generateContent();
+        });
+
+        // 콘텐츠 생성
+        async function generateContent() {
+            const button = document.querySelector('#content-form button[type="submit"]');
+            const businessName = document.getElementById('business-name').value;
+            const industry = document.getElementById('industry').value;
+            const target = document.getElementById('target').value;
+            const brandVoice = document.getElementById('brand-voice').value;
+
+            if (!businessName || !industry) {
+                showToast('비즈니스 이름과 업종을 입력해주세요.', 'warning');
+                return;
+            }
+
+            // 로딩 상태
+            button.classList.add('loading');
+
+            try {
+                const response = await fetch('/api/generate-content', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        business_name: businessName,
+                        industry: industry,
+                        target_audience: target || '일반 고객',
+                        brand_voice: brandVoice
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentContent = {
+                        caption: data.content.caption,
+                        hashtags: data.content.hashtags,
+                        imageUrl: data.content.image_url,
+                        businessName: businessName
+                    };
+
+                    // 편집기에 내용 채우기
+                    document.getElementById('caption-editor').value = currentContent.caption;
+                    document.getElementById('hashtags-editor').value = currentContent.hashtags.join(' ');
+                    document.getElementById('image-url-editor').value = currentContent.imageUrl;
+
+                    // 미리보기 업데이트
+                    updatePreview();
+                    
+                    // 카드 표시
+                    document.getElementById('editor-card').style.display = 'block';
+                    document.getElementById('preview-card').style.display = 'block';
+                    document.getElementById('stats-card').style.display = 'block';
+                    document.getElementById('post-btn').disabled = false;
+
+                    showToast('콘텐츠가 성공적으로 생성되었습니다! 🎉', 'success');
+                } else {
+                    showToast('콘텐츠 생성에 실패했습니다: ' + (data.error || '알 수 없는 오류'), 'danger');
+                }
+            } catch (error) {
+                showToast('서버 연결 오류가 발생했습니다.', 'danger');
+                console.error('콘텐츠 생성 오류:', error);
+            } finally {
+                button.classList.remove('loading');
+            }
+        }
+
+        // 미리보기 업데이트
+        function updatePreview() {
+            const caption = document.getElementById('caption-editor').value;
+            const hashtags = document.getElementById('hashtags-editor').value;
+            const imageUrl = document.getElementById('image-url-editor').value;
+            const businessName = document.getElementById('business-name').value;
+
+            // Instagram 미리보기 업데이트
+            document.getElementById('preview-caption').textContent = caption;
+            document.getElementById('preview-hashtags').textContent = hashtags;
+            document.getElementById('preview-business-name').textContent = businessName.toLowerCase().replace(/\s+/g, '_');
+            document.getElementById('preview-username').textContent = businessName.toLowerCase().replace(/\s+/g, '_');
+            
+            if (imageUrl) {
+                document.getElementById('preview-image').src = imageUrl;
+            }
+
+            // 프로필 사진 첫 글자
+            const profilePic = document.querySelector('.profile-pic');
+            profilePic.textContent = businessName ? businessName.charAt(0).toUpperCase() : 'B';
+
+            // 통계 업데이트
+            updateStats(caption, hashtags);
+
+            // 현재 콘텐츠 저장
+            currentContent = {
+                caption: caption,
+                hashtags: hashtags.split(/\s+/).filter(tag => tag.trim()),
+                imageUrl: imageUrl,
+                businessName: businessName
+            };
+        }
+
+        // 통계 업데이트
+        function updateStats(caption, hashtags) {
+            const captionLength = caption.length;
+            const hashtagArray = hashtags.split(/\s+/).filter(tag => tag.trim());
+            const hashtagCount = hashtagArray.length;
+
+            document.getElementById('stat-caption-length').textContent = captionLength + '자';
+            document.getElementById('stat-hashtag-count').textContent = hashtagCount + '개';
+            document.getElementById('caption-length').textContent = captionLength;
+            document.getElementById('hashtag-count').textContent = hashtagCount;
+
+            // 바이럴 점수 계산 (간단한 알고리즘)
+            let viralScore = 50;
+            if (captionLength >= 100 && captionLength <= 300) viralScore += 20;
+            if (hashtagCount >= 5 && hashtagCount <= 15) viralScore += 15;
+            if (caption.includes('!') || caption.includes('?')) viralScore += 10;
+            if (hashtagArray.some(tag => tag.includes('트렌드') || tag.includes('핫플') || tag.includes('인기'))) viralScore += 5;
+
+            document.getElementById('stat-viral-score').textContent = Math.min(viralScore, 100) + '/100';
+
+            // 도달범위 예측
+            const reach = viralScore >= 80 ? '매우 높음' : viralScore >= 60 ? '높음' : viralScore >= 40 ? '보통' : '낮음';
+            document.getElementById('stat-reach').textContent = reach;
+
+            // 색상 업데이트
+            const reachElement = document.getElementById('stat-reach');
+            reachElement.className = viralScore >= 80 ? 'fw-bold text-success' : 
+                                   viralScore >= 60 ? 'fw-bold text-info' : 
+                                   viralScore >= 40 ? 'fw-bold text-warning' : 'fw-bold text-danger';
+        }
+
+        // 콘텐츠 재생성
+        async function regenerateContent() {
+            await generateContent();
+        }
+
+        // Instagram 포스팅
+        async function postToInstagram() {
+            const button = document.getElementById('post-btn');
+            button.classList.add('loading');
+
+            if (!currentContent.caption || !currentContent.imageUrl) {
+                showToast('먼저 콘텐츠를 생성해주세요.', 'warning');
+                button.classList.remove('loading');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/post-instagram-final', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        caption: currentContent.caption + '\n\n' + currentContent.hashtags.join(' '),
+                        image_url: currentContent.imageUrl
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Instagram 포스팅이 완료되었습니다! 🎉', 'success');
+                    
+                    // 성공 통계 업데이트
+                    updatePostStats();
+                } else {
+                    showToast('포스팅 실패: ' + (data.detail?.message || data.detail || '알 수 없는 오류'), 'danger');
+                }
+            } catch (error) {
+                showToast('포스팅 중 오류가 발생했습니다.', 'danger');
+                console.error('포스팅 오류:', error);
+            } finally {
+                button.classList.remove('loading');
+            }
+        }
+
+        // AI 캡션 최적화
+        async function optimizeCaption() {
+            const currentCaption = document.getElementById('caption-editor').value;
+            if (!currentCaption) {
+                showToast('먼저 캡션을 입력해주세요.', 'warning');
+                return;
+            }
+
+            showToast('AI가 캡션을 최적화하고 있습니다...', 'info');
+
+            // 시뮬레이션 (실제로는 AI API 호출)
+            setTimeout(() => {
+                const optimizedCaption = currentCaption + '\n\n✨ 특별한 순간을 함께 만들어보세요!';
+                document.getElementById('caption-editor').value = optimizedCaption;
+                updatePreview();
+                showToast('캡션이 최적화되었습니다!', 'success');
+            }, 2000);
+        }
+
+        // 해시태그 추천
+        function suggestHashtags() {
+            const industry = document.getElementById('industry').value;
+            const suggestions = {
+                'restaurant': ['#맛집추천', '#분위기좋은곳', '#데이트코스', '#혼밥맛집', '#감성카페'],
+                'fashion': ['#데일리룩', '#패션트렌드', '#스타일링', '#옷스타그램', '#ootd'],
+                'beauty': ['#뷰티팁', '#자연메이크업', '#스킨케어', '#글로우업', '#셀프케어'],
+                'fitness': ['#홈트레이닝', '#건강한생활', '#운동일기', '#피트니스', '#다이어트']
+            };
+
+            const recommended = suggestions[industry] || suggestions['restaurant'];
+            const currentHashtags = document.getElementById('hashtags-editor').value;
+            const newHashtags = currentHashtags + ' ' + recommended.join(' ');
+            
+            document.getElementById('hashtags-editor').value = newHashtags.trim();
+            updatePreview();
+            showToast('추천 해시태그가 추가되었습니다!', 'success');
+        }
+
+        // 이미지 변경
+        function changeImage() {
+            const newUrl = document.getElementById('image-url-editor').value;
+            if (newUrl) {
+                document.getElementById('preview-image').src = newUrl;
+                currentContent.imageUrl = newUrl;
+                showToast('이미지가 변경되었습니다!', 'success');
+            }
+        }
+
+        // 콘텐츠 복사
+        async function copyContent() {
+            const fullContent = currentContent.caption + '\n\n' + currentContent.hashtags.join(' ');
+            
+            try {
+                await navigator.clipboard.writeText(fullContent);
+                showToast('콘텐츠가 클립보드에 복사되었습니다! 📋', 'success');
+            } catch (error) {
+                showToast('복사에 실패했습니다.', 'danger');
+            }
+        }
+
+        // 콘텐츠 저장
+        async function saveContent() {
+            showToast('콘텐츠를 저장하고 있습니다...', 'info');
+            
+            // 실제 저장 로직 (시뮬레이션)
+            setTimeout(() => {
+                showToast('콘텐츠가 저장되었습니다! 💾', 'success');
+            }, 1000);
+        }
+
+        // 콘텐츠 초기화
+        function resetContent() {
+            document.getElementById('caption-editor').value = '';
+            document.getElementById('hashtags-editor').value = '';
+            document.getElementById('image-url-editor').value = '';
+            
+            currentContent = {
+                caption: '',
+                hashtags: [],
+                imageUrl: '',
+                businessName: ''
+            };
+            
+            updatePreview();
+            showToast('콘텐츠가 초기화되었습니다.', 'info');
+        }
+
+        // 예약 포스팅
+        function schedulePost() {
+            showToast('예약 포스팅 기능은 준비 중입니다! ⏰', 'info');
+        }
+
+        // 템플릿 불러오기
+        function loadTemplate() {
+            const templates = {
+                'restaurant': {
+                    caption: '🍽️ 오늘도 신선한 재료로 정성스럽게 준비했습니다! 특별한 맛을 경험해보세요.',
+                    hashtags: '#맛집 #맛스타그램 #신선한재료 #정성 #특별한맛'
+                },
+                'fashion': {
+                    caption: '✨ 새로운 시즌, 새로운 스타일! 트렌디한 룩으로 당신의 매력을 표현해보세요.',
+                    hashtags: '#패션 #스타일 #트렌드 #ootd #매력적인'
+                }
+            };
+
+            const industry = document.getElementById('industry').value;
+            const template = templates[industry] || templates['restaurant'];
+            
+            document.getElementById('caption-editor').value = template.caption;
+            document.getElementById('hashtags-editor').value = template.hashtags;
+            
+            updatePreview();
+            showToast('템플릿이 불러와졌습니다!', 'success');
+        }
+
+        // 최근 콘텐츠 보기
+        function showHistory() {
+            showToast('콘텐츠 히스토리 기능은 준비 중입니다! 📚', 'info');
+        }
+
+        // Instagram 테스트
+        async function testInstagram() {
+            showToast('Instagram 연결을 테스트하고 있습니다...', 'info');
+            
+            try {
+                const response = await fetch('/api/test-instagram-simple');
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Instagram 연결이 정상입니다! ✅', 'success');
+                } else {
+                    showToast('Instagram 연결에 문제가 있습니다: ' + data.error, 'warning');
+                }
+            } catch (error) {
+                showToast('Instagram 테스트 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 성과 분석
+        function showAnalytics() {
+            showToast('성과 분석 기능은 준비 중입니다! 📈', 'info');
+        }
+
+        // 포스팅 통계 업데이트
+        function updatePostStats() {
+            // 성공한 포스팅 수 증가 등의 로직
+        }
+
+        // 프로필 보기
+        function showProfile() {
+            showToast('프로필 설정 기능은 준비 중입니다! 👤', 'info');
+        }
+
+        // 설정
+        function showSettings() {
+            showToast('설정 기능은 준비 중입니다! ⚙️', 'info');
+        }
+
+        // 로그아웃
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (error) {
+                window.location.href = '/login';
+            }
+        }
+
+        // 토스트 알림
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toast-container');
+            const toastId = 'toast-' + Date.now();
+            
+            const bgColor = {
+                'success': 'bg-success',
+                'danger': 'bg-danger', 
+                'warning': 'bg-warning text-dark',
+                'info': 'bg-info'
+            }[type] || 'bg-info';
+
+            const toastHTML = `
+                <div id="${toastId}" class="toast align-items-center text-white ${bgColor} border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+            
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 4000 });
+            toast.show();
+            
+            // 토스트가 숨겨진 후 DOM에서 제거
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        // 실시간 입력 감지
+        document.getElementById('caption-editor').addEventListener('input', updatePreview);
+        document.getElementById('hashtags-editor').addEventListener('input', updatePreview);
+        document.getElementById('image-url-editor').addEventListener('change', updatePreview);
+    </script>
+</body>
+</html>

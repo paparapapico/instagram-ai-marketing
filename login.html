@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 - Instagram AI Marketing</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            font-family: 'Segoe UI', Tequila, Arial, sans-serif;
+        }
+        
+        .auth-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            max-width: 900px;
+            width: 100%;
+        }
+        
+        .auth-left {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 500px;
+        }
+        
+        .auth-right {
+            padding: 3rem;
+        }
+        
+        .form-switch {
+            margin-bottom: 2rem;
+        }
+        
+        .form-switch .nav-link {
+            color: #6c757d;
+            border-radius: 10px;
+            padding: 0.75rem 1.5rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .form-switch .nav-link.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .form-control {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 10px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #5a6fd8, #6a42a0);
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 1rem;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="auth-container">
+                    <div class="row g-0">
+                        <!-- 왼쪽: 브랜드 소개 -->
+                        <div class="col-lg-5">
+                            <div class="auth-left">
+                                <div class="text-center mb-4">
+                                    <h1 class="display-4">🚀</h1>
+                                    <h2>Instagram AI Marketing</h2>
+                                    <p class="lead">AI로 만드는 완벽한 Instagram 마케팅</p>
+                                </div>
+                                
+                                <div class="features">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="feature-icon me-3">🤖</div>
+                                        <div>
+                                            <h5>AI 콘텐츠 생성</h5>
+                                            <small>GPT 기반 맞춤형 콘텐츠</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="feature-icon me-3">📱</div>
+                                        <div>
+                                            <h5>자동 포스팅</h5>
+                                            <small>Instagram 직접 연동</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex align-items-center">
+                                        <div class="feature-icon me-3">📊</div>
+                                        <div>
+                                            <h5>성과 분석</h5>
+                                            <small>실시간 마케팅 인사이트</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 오른쪽: 로그인/회원가입 폼 -->
+                        <div class="col-lg-7">
+                            <div class="auth-right position-relative">
+                                <!-- 로딩 오버레이 -->
+                                <div class="loading-overlay" id="loading-overlay">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary mb-3"></div>
+                                        <p class="text-muted">처리 중...</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- 폼 전환 탭 -->
+                                <div class="form-switch">
+                                    <nav class="nav nav-pills nav-fill">
+                                        <a class="nav-link active" href="#" onclick="showLogin()">로그인</a>
+                                        <a class="nav-link" href="#" onclick="showRegister()">회원가입</a>
+                                    </nav>
+                                </div>
+                                
+                                <!-- 로그인 폼 -->
+                                <div id="login-form">
+                                    <h3 class="mb-4">반갑습니다! 👋</h3>
+                                    
+                                    <form onsubmit="handleLogin(event)">
+                                        <div class="mb-3">
+                                            <label class="form-label">이메일</label>
+                                            <input type="email" class="form-control" id="login-email" required
+                                                   placeholder="your@email.com">
+                                        </div>
+                                        
+                                        <div class="mb-4">
+                                            <label class="form-label">비밀번호</label>
+                                            <input type="password" class="form-control" id="login-password" required
+                                                   placeholder="비밀번호를 입력하세요">
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-primary w-100 mb-3">
+                                            로그인하기
+                                        </button>
+                                    </form>
+                                    
+                                    <div class="text-center">
+                                        <small class="text-muted">
+                                            계정이 없으시나요? 
+                                            <a href="#" onclick="showRegister()" class="text-primary">회원가입</a>
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <!-- 회원가입 폼 -->
+                                <div id="register-form" style="display: none;">
+                                    <h3 class="mb-4">시작해보세요! 🎯</h3>
+                                    
+                                    <form onsubmit="handleRegister(event)">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">이메일</label>
+                                                <input type="email" class="form-control" id="register-email" required
+                                                       placeholder="your@email.com">
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">비밀번호</label>
+                                                <input type="password" class="form-control" id="register-password" required
+                                                       placeholder="8자 이상" minlength="8">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">비즈니스 이름</label>
+                                                <input type="text" class="form-control" id="register-business" required
+                                                       placeholder="우리 카페">
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-4">
+                                                <label class="form-label">업종</label>
+                                                <select class="form-select" id="register-industry" required>
+                                                    <option value="">업종 선택</option>
+                                                    <option value="restaurant">🍽️ 음식점/카페</option>
+                                                    <option value="fashion">👔 패션/의류</option>
+                                                    <option value="beauty">💄 뷰티/화장품</option>
+                                                    <option value="fitness">💪 피트니스/헬스</option>
+                                                    <option value="retail">🛍️ 소매/쇼핑</option>
+                                                    <option value="tech">💻 IT/테크</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-primary w-100 mb-3">
+                                            계정 만들기
+                                        </button>
+                                    </form>
+                                    
+                                    <div class="text-center">
+                                        <small class="text-muted">
+                                            이미 계정이 있으신가요? 
+                                            <a href="#" onclick="showLogin()" class="text-primary">로그인</a>
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <!-- 알림 영역 -->
+                                <div id="alert-container" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 폼 전환
+        function showLogin() {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+            
+            // 탭 활성화
+            document.querySelectorAll('.form-switch .nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            document.querySelector('.form-switch .nav-link:first-child').classList.add('active');
+            
+            clearAlerts();
+        }
+        
+        function showRegister() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+            
+            // 탭 활성화
+            document.querySelectorAll('.form-switch .nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            document.querySelector('.form-switch .nav-link:last-child').classList.add('active');
+            
+            clearAlerts();
+        }
+        
+        // 알림 함수들
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alert-container');
+            const alertId = `alert-${Date.now()}`;
+            
+            const alertHTML = `
+                <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            alertContainer.innerHTML = alertHTML;
+            
+            // 3초 후 자동 제거
+            setTimeout(() => {
+                const alertElement = document.getElementById(alertId);
+                if (alertElement) {
+                    const bsAlert = new bootstrap.Alert(alertElement);
+                    bsAlert.close();
+                }
+            }, 5000);
+        }
+        
+        function clearAlerts() {
+            document.getElementById('alert-container').innerHTML = '';
+        }
+        
+        function showLoading(show = true) {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+        
+        // 로그인 처리
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!email || !password) {
+                showAlert('이메일과 비밀번호를 모두 입력해주세요.', 'warning');
+                return;
+            }
+            
+            showLoading(true);
+            clearAlerts();
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(`환영합니다, ${data.user.business_name}님! 🎉`, 'success');
+                    
+                    // 2초 후 대시보드로 리다이렉트
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 2000);
+                } else {
+                    showAlert(data.detail || '로그인에 실패했습니다.', 'danger');
+                }
+            } catch (error) {
+                showAlert('서버 연결 오류가 발생했습니다.', 'danger');
+                console.error('로그인 오류:', error);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // 회원가입 처리
+        async function handleRegister(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const businessName = document.getElementById('register-business').value;
+            const industry = document.getElementById('register-industry').value;
+            
+            // 유효성 검사
+            if (!email || !password || !businessName || !industry) {
+                showAlert('모든 필드를 입력해주세요.', 'warning');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showAlert('비밀번호는 8자 이상이어야 합니다.', 'warning');
+                return;
+            }
+            
+            // 이메일 형식 검사
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAlert('올바른 이메일 형식을 입력해주세요.', 'warning');
+                return;
+            }
+            
+            showLoading(true);
+            clearAlerts();
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password,
+                        business_name: businessName,
+                        industry: industry
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(`회원가입 완료! 환영합니다, ${data.user.business_name}님! 🎉`, 'success');
+                    
+                    // 2초 후 대시보드로 리다이렉트
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 2000);
+                } else {
+                    showAlert(data.detail || '회원가입에 실패했습니다.', 'danger');
+                }
+            } catch (error) {
+                showAlert('서버 연결 오류가 발생했습니다.', 'danger');
+                console.error('회원가입 오류:', error);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Enter 키 이벤트 처리
+        document.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                const loginForm = document.getElementById('login-form');
+                const registerForm = document.getElementById('register-form');
+                
+                if (loginForm.style.display !== 'none') {
+                    const loginButton = loginForm.querySelector('button[type="submit"]');
+                    loginButton.click();
+                } else if (registerForm.style.display !== 'none') {
+                    const registerButton = registerForm.querySelector('button[type="submit"]');
+                    registerButton.click();
+                }
+            }
+        });
+        
+        // 데모 계정 로그인 (개발용)
+        function loginDemo() {
+            document.getElementById('login-email').value = 'demo@example.com';
+            document.getElementById('login-password').value = 'demo123456';
+            showAlert('데모 계정 정보가 입력되었습니다.', 'info');
+        }
+    </script>
+    
+    <!-- 데모 버튼 (개발용) -->
+    <div class="position-fixed bottom-0 end-0 p-3">
+        <button class="btn btn-sm btn-outline-secondary" onclick="loginDemo()" style="opacity: 0.7;">
+            🧪 데모 로그인
+        </button>
+    </div>
+</body>
+</html>
