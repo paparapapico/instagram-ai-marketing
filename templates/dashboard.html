@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram 대시보드</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container-dashboard { margin-top: 60px; max-width: 600px; }
+    </style>
+</head>
+<body>
+    <div class="container container-dashboard">
+        <h2 class="mb-4">Instagram 포스팅</h2>
+        <form id="post-form">
+            <div class="mb-3">
+                <label for="caption" class="form-label">캡션</label>
+                <textarea class="form-control" id="caption" rows="3" required></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="image-url" class="form-label">이미지 URL (선택)</label>
+                <input type="url" class="form-control" id="image-url" placeholder="https://example.com/image.jpg">
+            </div>
+            <button type="submit" class="btn btn-primary w-100">포스팅하기</button>
+        </form>
+        <div id="post-result" class="mt-4"></div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 토큰 체크
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            alert('로그인이 필요합니다.');
+            window.location.href = '/';
+            return;
+        }
+        // 포스팅 폼
+        const postForm = document.getElementById('post-form');
+        if (postForm) {
+            postForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const caption = document.getElementById('caption').value;
+                const image_url = document.getElementById('image-url').value;
+                try {
+                    const res = await fetch('/api/post-instagram', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ caption, image_url })
+                    });
+                    const data = await res.json();
+                    const resultDiv = document.getElementById('post-result');
+                    if (res.ok && data.success) {
+                        resultDiv.innerHTML = `<div class='alert alert-success'>포스팅 성공!<br>Post ID: ${data.post_id}</div>`;
+                    } else {
+                        resultDiv.innerHTML = `<div class='alert alert-danger'>실패: ${data.message || '포스팅 실패'}</div>`;
+                    }
+                } catch (err) {
+                    document.getElementById('post-result').innerHTML = `<div class='alert alert-danger'>네트워크 오류 또는 서버 오류</div>`;
+                }
+            });
+        }
+    });
+    </script>
+</body>
+</html>
