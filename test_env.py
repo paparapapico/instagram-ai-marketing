@@ -15,7 +15,7 @@ def test_environment_variables():
         'OPENAI_API_KEY': 'OpenAI API 키',
         'INSTAGRAM_ACCESS_TOKEN': 'Instagram 액세스 토큰',
         'INSTAGRAM_BUSINESS_ACCOUNT_ID': 'Instagram 비즈니스 계정 ID',
-        'SECRET_KEY': 'JWT 시크릿 키'
+        'JWT_SECRET': 'JWT 시크릿 키'
     }
     
     results = {}
